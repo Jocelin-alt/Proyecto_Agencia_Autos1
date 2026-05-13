@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inicio</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-dark text-light">
+
+    <nav class="navbar navbar-dark bg-black shadow">
+        <div class="container">
+
+            <span class="navbar-brand mb-0 h1">
+                Agencia de Autos
+            </span>
+
+            <a href="{{ url_for('logout') }}" class="btn btn-danger">
+                Cerrar sesión
+            </a>
+
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card bg-secondary text-light shadow-lg border-0">
+
+            <div class="card-body p-5 text-center">
+
+                <h1 class="display-5">
+                    Bienvenido {{ usuario }}
+                </h1>
+
+                <p class="mt-3">
+                    Sistema de venta de autos
+                </p>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>
