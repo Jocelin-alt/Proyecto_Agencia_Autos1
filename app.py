@@ -1,4 +1,7 @@
 from flask import Flask, render_template, request, redirect, session, url_for, flash
+from flask_mail import Mail, Message
+from itsdangerous import URLSafeTimedSerializer, SignatureExpired
+from werkzeug.security import generate_password_hash
 from autos import Autos
 
 app = Flask(__name__)
@@ -6,6 +9,16 @@ app = Flask(__name__)
 app.secret_key = "secret123"
 
 autos = Autos()
+
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = 'agenciaautos67@gmail.com' 
+app.config['MAIL_PASSWORD'] = 'hjlernporwxwkbpl' 
+
+mail = Mail(app)
+
+s = URLSafeTimedSerializer(app.secret_key)
 
 
 @app.route("/")
@@ -92,6 +105,64 @@ def login():
 
     return render_template("login.html")
 
+@app.route('/recuperar-contrasena', methods=['GET', 'POST'])
+def recuperar_contrasena():
+    if request.method == 'POST':
+        email = request.form['email']
+        
+       
+        usuario = autos.usuarios.find_one({"email": email})
+        
+        if usuario:
+            
+            token = s.dumps(email, salt='recuperacion-pass')
+            enlace = url_for('restablecer_contrasena', token=token, _external=True)
+            
+            
+            msg = Message('Recuperación de contraseña', 
+                          sender=app.config['MAIL_USERNAME'], 
+                          recipients=[email])
+            msg.body = f'Para restablecer tu contraseña, haz clic en el siguiente enlace. Este enlace caducará en 1 hora:\n\n{enlace}'
+            
+            
+            try:
+                mail.send(msg)
+            except Exception as e:
+                print(f"Error al enviar el correo: {e}")
+        
+        
+        flash('Si el correo existe en nuestro sistema, hemos enviado las instrucciones.', 'success')
+        return redirect(url_for('login'))
+
+    return render_template("recuperar.html")
+
+
+@app.route('/restablecer-contrasena/<token>', methods=['GET', 'POST'])
+def restablecer_contrasena(token):
+    try:
+      
+        email = s.loads(token, salt='recuperacion-pass', max_age=3600)
+    except SignatureExpired:
+        flash('El enlace de recuperación ha expirado. Solicita uno nuevo.', 'danger')
+        return redirect(url_for('recuperar_contrasena'))
+    except Exception:
+        flash('Enlace inválido.', 'danger')
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        nueva_password = request.form['password']
+        
+        
+        exito = autos.actualizar_contrasena(email, nueva_password)
+        
+        if exito:
+            flash('¡Tu contraseña ha sido actualizada exitosamente! Ya puedes iniciar sesión.', 'success')
+        else:
+            flash('Hubo un problema actualizando la contraseña.', 'danger')
+            
+        return redirect(url_for('login'))
+
+    return render_template("restablecer_contrasena.html", token=token)
 
 @app.route("/logout")
 def logout():
