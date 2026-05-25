@@ -1,12 +1,21 @@
+import os
+import uuid
+
 from flask import Flask, render_template, request, redirect, session, url_for, flash
 from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired
 from werkzeug.security import generate_password_hash
+from werkzeug.utils import secure_filename
 from autos import Autos
 
 app = Flask(__name__)
 
 app.secret_key = "secret123"
+app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'uploads')
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 autos = Autos()
 
@@ -19,6 +28,10 @@ app.config['MAIL_PASSWORD'] = 'hjlernporwxwkbpl'
 mail = Mail(app)
 
 s = URLSafeTimedSerializer(app.secret_key)
+
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 @app.route("/")
@@ -110,7 +123,6 @@ def recuperar_contrasena():
     if request.method == 'POST':
         email = request.form['email']
         
-       
         usuario = autos.usuarios.find_one({"email": email})
         
         if usuario:
@@ -120,8 +132,8 @@ def recuperar_contrasena():
             
             
             msg = Message('Recuperación de contraseña', 
-                          sender=app.config['MAIL_USERNAME'], 
-                          recipients=[email])
+                        sender=app.config['MAIL_USERNAME'], 
+                        recipients=[email])
             msg.body = f'Para restablecer tu contraseña, haz clic en el siguiente enlace. Este enlace caducará en 1 hora:\n\n{enlace}'
             
             
@@ -140,7 +152,6 @@ def recuperar_contrasena():
 @app.route('/restablecer-contrasena/<token>', methods=['GET', 'POST'])
 def restablecer_contrasena(token):
     try:
-      
         email = s.loads(token, salt='recuperacion-pass', max_age=3600)
     except SignatureExpired:
         flash('El enlace de recuperación ha expirado. Solicita uno nuevo.', 'danger')
@@ -163,6 +174,62 @@ def restablecer_contrasena(token):
         return redirect(url_for('login'))
 
     return render_template("restablecer_contrasena.html", token=token)
+
+@app.route('/Agregar', methods=['GET', 'POST'])
+@app.route('/agregar', methods=['GET', 'POST'])
+def agregar():
+
+    if "usuario" not in session:
+        flash(" Debes iniciar sesión", "warning")
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+        titulo = request.form.get("titulo", "").strip()
+        descripcion = request.form.get("descripcion", "").strip()
+        imagen = request.files.get("imagen")
+        imagen_url = None
+
+        if not titulo or not descripcion:
+            flash("Debes completar todos los campos", "danger")
+            return redirect(url_for("agregar"))
+
+        if imagen and imagen.filename:
+            if not allowed_file(imagen.filename):
+                flash("Formato de imagen no permitido. Usa png, jpg, jpeg o gif.", "danger")
+                return redirect(url_for("agregar"))
+
+            nombre_archivo = f"{uuid.uuid4().hex}_{secure_filename(imagen.filename)}"
+            ruta_archivo = os.path.join(app.config['UPLOAD_FOLDER'], nombre_archivo)
+            imagen.save(ruta_archivo)
+            imagen_url = f"uploads/{nombre_archivo}"
+
+        reporte_id = autos.subir_reporte(
+            session["usuario_id"],
+            titulo,
+            descripcion,
+            imagen_url
+        )
+
+        if reporte_id:
+            flash("Vehículo agregado correctamente", "success")
+            return redirect(url_for("comprar"))
+
+        flash("No se pudo agregar el vehículo. Intenta de nuevo.", "danger")
+        return redirect(url_for("agregar"))
+
+    return render_template("agregar_vehiculo.html")
+
+
+@app.route('/comprar')
+def comprar():
+
+    if "usuario" not in session:
+        flash(" Debes iniciar sesión", "warning")
+        return redirect(url_for("login"))
+
+    reportes = autos.obtener_reportes()
+    return render_template("compar.html", reportes=reportes)
+
 
 @app.route("/logout")
 def logout():

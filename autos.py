@@ -19,14 +19,14 @@ class Autos:
 
             self.cliente.admin.command('ping')
 
-            # Base de datos
+            
             self.db = self.cliente['venta_autos']
 
-            # Colecciones
+            
             self.usuarios = self.db['usuarios']
             self.reportes = self.db['reportes']
 
-            # Índices
+            
             self._crear_indices()
 
             print("✅ Conectado a MongoDB Atlas")
@@ -45,9 +45,7 @@ class Autos:
             [("usuario_id", 1)]
         )
 
-    # =========================================
-    # REGISTRO
-    # =========================================
+
 
     def registrar_usuario(
         self,
@@ -76,10 +74,6 @@ class Autos:
             print("❌ Ese correo ya está registrado")
             return None
 
-    # =========================================
-    # LOGIN
-    # =========================================
-
     def iniciar_sesion(
         self,
         email: str,
@@ -105,17 +99,13 @@ class Autos:
             print(f"❌ Error: {e}")
             return None
 
-    # =========================================
-    # ACTUALIZAR CONTRASEÑA (NUEVO)
-    # =========================================
+
 
     def actualizar_contrasena(self, email: str, nueva_password: str) -> bool:
         """Encripta y actualiza la contraseña de un usuario existente"""
         try:
-           
             password_encriptada = generate_password_hash(nueva_password)
             
-          
             resultado = self.usuarios.update_one(
                 {"email": email},
                 {"$set": {"password": password_encriptada}}
@@ -132,9 +122,6 @@ class Autos:
             print(f"❌ Error al actualizar contraseña: {e}")
             return False
 
-    # =========================================
-    # OBTENER USUARIO
-    # =========================================
 
     def obtener_usuario(
         self,
@@ -154,15 +141,14 @@ class Autos:
             print(f"❌ Error: {e}")
             return None
 
-    # =========================================
-    # SUBIR REPORTE / PUBLICACIÓN
-    # =========================================
+
 
     def subir_reporte(
         self,
         usuario_id: str,
         titulo: str,
-        descripcion: str
+        descripcion: str,
+        imagen_url: str = None
     ) -> Optional[str]:
 
         """Subir reporte/publicación de auto"""
@@ -172,7 +158,8 @@ class Autos:
                 "titulo": titulo,
                 "descripcion": descripcion,
                 "fecha_publicacion": datetime.now(),
-                "activo": True
+                "activo": True,
+                "imagen_url": imagen_url
             }
 
             resultado = self.reportes.insert_one(reporte)
@@ -183,9 +170,21 @@ class Autos:
             print(f"❌ Error: {e}")
             return None
 
-    # =========================================
-    # CERRAR CONEXIÓN
-    # =========================================
+
+
+    def obtener_reportes(self):
+        """Recuperar autos publicados para comprar"""
+        try:
+            reportes = list(self.reportes.find({"activo": True}).sort("fecha_publicacion", -1))
+            for reporte in reportes:
+                reporte["_id"] = str(reporte["_id"])
+                reporte["usuario_id"] = str(reporte["usuario_id"])
+            return reportes
+
+        except Exception as e:
+            print(f"❌ Error al obtener reportes: {e}")
+            return []
+
 
     def cerrar_conexion(self):
         if self.cliente:
